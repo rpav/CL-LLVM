@@ -3,13 +3,6 @@
 
 (in-package :llvm-system)
 
-;;; NOTE: before this will work, you need to have LLVM installed (and don't
-;;;       forget to build the shared lib with --enable-shared)
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (mapc #+quicklisp #'ql:quickload #-quicklisp #'asdf:load-system
-        '(cffi-grovel)))
-
 (defsystem llvm
   :description "CFFI bindings to the LLVM libraries."
   :long-description "LLVM is a collection of modular and reusable compiler and
@@ -17,37 +10,35 @@
                      hopefully intuitive) to use them in Common Lisp."
   :license "MIT"
   :author "Greg Pfeil <greg@technomadic.org>"
-  :depends-on (cffi cffi-grovel trivial-features)
+  :depends-on (alexandria trivial-features trivial-garbage cl-autowrap cl-plus-c)
   :pathname "src/"
   :components
   ((:file "package")
    (:file "cffi" :depends-on ("package"))
+   (:module "autowrap-spec"
+            :pathname "spec"
+            :components ((:static-file "llvm-3.4.h")))
+   (:file "autowrap" :depends-on ("package" "cffi" "autowrap-spec"))
    (:module "core"
-            :depends-on ("package" "cffi")
-            :components ((cffi-grovel:grovel-file "grovel")
-                         (:file "error-handling" :depends-on ("grovel"))
+            :depends-on ("package" "cffi" "autowrap")
+            :components ((:file "error-handling")
                          (:file "modules"
-                                :depends-on ("grovel" "error-handling"))
+                                :depends-on ("error-handling"))
                          (:file "types"
-                                :depends-on ("grovel" "modules" "error-handling"))
+                                :depends-on ("modules" "error-handling"))
                          (:file "values"
-                                :depends-on ("grovel" "modules" "error-handling"))
+                                :depends-on ("modules" "error-handling"))
                          (:file "instruction-builders"
-                                :depends-on ("grovel" "error-handling"))
+                                :depends-on ("error-handling"))
                          (:file "memory-buffers"
-                                :depends-on ("grovel" "error-handling"))
-                         (:file "pass-managers"
-                                :depends-on ("grovel" "error-handling"))))
+                                :depends-on ("error-handling"))))
    (:module "" :pathname ""
             :depends-on ("package" "cffi" "core")
-            :components ((cffi-grovel:grovel-file "analysis-grovel")
-                         (:file "analysis" :depends-on ("analysis-grovel"))
+            :components ((:file "analysis")
                          (:file "bit-reader")
                          (:file "bit-writer")
                          (:file "execution-engine")
-                         (cffi-grovel:grovel-file "target-grovel")
-                         (:file "target" :depends-on ("target-grovel"))
-                         (:file "scalar-transforms")))))
+                         (:file "target")))))
 
 ;;; NOTE: In order to load and run the Kaleidoscope tutorial, you first need to
 ;;;       run `./build-library.sh` in the tutorial subdirectory.

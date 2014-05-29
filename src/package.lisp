@@ -33,7 +33,7 @@
         (do-stuff memory-buffer))
     and it will handle the disposal for you. This is _better_. Using the
     disposal directly can lead to leaks if you forget UNWIND-PROTECT, etc.")
-  (:use #:cl #:cffi)
+  (:use #:cl #:plus-c #:autowrap.minimal)
   (:shadow #:constantp #:type #:type-of)
   (:export #:with-object #:with-objects
            ;; modules
@@ -239,3 +239,7 @@
            #:add-tail-call-elimination-pass
            #:add-constant-propagation-pass
            #:add-demote-memory-to-register-pass))
+
+(defpackage llvm.ffi
+  (:documentation "Blank package for non-function autowrap symbols")
+  (:use))

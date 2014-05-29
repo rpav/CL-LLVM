@@ -1,18 +1,19 @@
 (in-package :llvm)
 
-(defcfun* "LLVMCreateMemoryBufferWithContentsOfFile" :int
-  (path :string)
-  (out-mem-buf (:pointer memory-buffer)) (out-message (:pointer :string)))
-(defcfun* "LLVMCreateMemoryBufferWithSTDIN" :int
-  (out-mem-buf (:pointer memory-buffer)) (out-message (:pointer :string)))
 (defun make-memory-buffer (&optional path)
-  (with-foreign-objects ((out-mem-buf '(:pointer memory-buffer))
-                         (out-message '(:pointer :string)))
+  (c-with ((out-mem-buf llvm.ffi:memory-buffer-ref)
+           (out-message :pointer))
     (if (= (if path
-             (create-memory-buffer-with-contents-of-file path
-                                                         out-mem-buf out-message)
-             (create-memory-buffer-with-stdin out-mem-buf out-message))
+               (create-memory-buffer-with-contents-of-file path
+                                                           (out-mem-buf &)
+                                                           (out-message &))
+               (create-memory-buffer-with-stdin (out-mem-buf &)
+                                                (out-message &)))
            0)
-      (mem-ref out-mem-buf 'memory-buffer)
-      (error 'llvm-error :message out-message))))
-(defcfun* "LLVMDisposeMemoryBuffer" :void (mem-buf memory-buffer))
+        (making-autocollect-instance (ptr llvm.ffi:memory-buffer-ref) out-mem-buf
+          (%dispose-memory-buffer ptr))
+        (error 'llvm-error :message out-message))))
+
+(defun dispose-memory-buffer (buffer)
+  (with-autocollect-cancel (buffer)
+    (%dispose-memory-buffer buffer)))
