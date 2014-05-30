@@ -17,15 +17,15 @@
      'tok-identifier, or 'tok-number."
     (flet ((get-char () (read-char *standard-input* nil nil)))
       (loop while (find last-char +whitespace+)
-        do (setf last-char (get-char)))
+            do (setf last-char (get-char)))
       (cond ((eql last-char nil) ; check for EOF, do not eat
              'tok-eof)
             ((alpha-char-p last-char)
              (setf *identifier-string*
                    (coerce (cons last-char
                                  (loop do (setf last-char (get-char))
-                                   while (alphanumericp last-char)
-                                   collecting last-char))
+                                       while (alphanumericp last-char)
+                                       collecting last-char))
                            'string))
              (cond ((string= *identifier-string* "def") 'tok-def)
                    ((string= *identifier-string* "extern") 'tok-extern)
@@ -37,14 +37,14 @@
                      (read-from-string
                       (coerce (cons last-char
                                     (loop do (setf last-char (get-char))
-                                      while (or (digit-char-p last-char)
-                                                (char= last-char #\.))
-                                      collecting last-char))
+                                          while (or (digit-char-p last-char)
+                                                    (char= last-char #\.))
+                                          collecting last-char))
                               'string))))
              'tok-number)
             ((eql last-char #\#) ; comment until end of line
              (loop do (setf last-char (get-char))
-               until (find last-char '(nil #\linefeed #\return)))
+                   until (find last-char '(nil #\linefeed #\return)))
              (if (null last-char) 'tok-eof (read-token)))
             (t
              (let ((this-char last-char))
@@ -105,22 +105,22 @@
 (defun parse-identifier-expression ()
   (let ((id-name *identifier-string*))
     (if (eql (get-next-token) #\()
-      (prog2 (get-next-token) ; eat (
-          (make-instance 'call-expression
-            :callee id-name
-            :arguments (if (not (eql *current-token* #\)))
-                         (loop
-                           for arg = (parse-expression)
-                           unless arg
-                           do (return-from parse-identifier-expression)
-                           collecting arg
-                           until (eql *current-token* #\))
-                           do (or (eql *current-token* #\,)
-                                  (error 'kaleidoscope-error
-                                         :message "Expected ')' or ',' in argument list"))
-                              (get-next-token))))
-        (get-next-token)) ; eat the ')'.
-      (make-instance 'variable-expression :name id-name))))
+        (prog2 (get-next-token) ; eat (
+            (make-instance 'call-expression
+                           :callee id-name
+                           :arguments (if (not (eql *current-token* #\)))
+                                          (loop
+                                            for arg = (parse-expression)
+                                            unless arg
+                                              do (return-from parse-identifier-expression)
+                                            collecting arg
+                                            until (eql *current-token* #\))
+                                            do (or (eql *current-token* #\,)
+                                                   (error 'kaleidoscope-error
+                                                          :message "Expected ')' or ',' in argument list"))
+                                               (get-next-token))))
+          (get-next-token)) ; eat the ')'.
+        (make-instance 'variable-expression :name id-name))))
 
 (defun parse-number-expression ()
   (prog1 (make-instance 'number-expression :value (coerce *number-value* 'double-float))
@@ -131,8 +131,8 @@
   (let ((v (parse-expression)))
     (when v
       (if (eql *current-token* #\))
-        (get-next-token)
-        (error 'kaleidoscope-error :message "expected ')'"))
+          (get-next-token)
+          (error 'kaleidoscope-error :message "expected ')'"))
       v)))
 
 (defun parse-primary ()
@@ -147,20 +147,20 @@
   (do () (nil)
     (let ((token-precedence (get-precedence *current-token*)))
       (if (< token-precedence expression-precedence)
-        (return-from parse-bin-op-rhs lhs)
-        (let ((binary-operator *current-token*))
-          (get-next-token)
-          (let ((rhs (parse-primary)))
-            (when rhs
-              (let ((next-precedence (get-precedence *current-token*)))
-                (when (< token-precedence next-precedence)
-                  (setf rhs (parse-bin-op-rhs (1+ token-precedence) rhs))
-                  (unless rhs
-                    (return-from parse-bin-op-rhs))))
-              (setf lhs
-                    (make-instance 'binary-expression
-                      :operator binary-operator
-                      :lhs lhs :rhs rhs)))))))))
+          (return-from parse-bin-op-rhs lhs)
+          (let ((binary-operator *current-token*))
+            (get-next-token)
+            (let ((rhs (parse-primary)))
+              (when rhs
+                (let ((next-precedence (get-precedence *current-token*)))
+                  (when (< token-precedence next-precedence)
+                    (setf rhs (parse-bin-op-rhs (1+ token-precedence) rhs))
+                    (unless rhs
+                      (return-from parse-bin-op-rhs))))
+                (setf lhs
+                      (make-instance 'binary-expression
+                                     :operator binary-operator
+                                     :lhs lhs :rhs rhs)))))))))
 
 (defun parse-expression ()
   (let ((lhs (parse-primary)))
@@ -176,7 +176,7 @@
           (error 'kaleidoscope-error :message "Expected '(' in prototype"))
         (let ((arg-names (coerce (loop while (eql (get-next-token)
                                                   'tok-identifier)
-                                    collecting *identifier-string*)
+                                       collecting *identifier-string*)
                                  'vector)))
           (unless (eql *current-token* #\))
             (error 'kaleidoscope-error :message "Expected ')' in prototype"))
@@ -189,18 +189,18 @@
   (get-next-token) ; eat def
   (let ((prototype (parse-prototype)))
     (if prototype
-      (let ((expression (parse-expression)))
-        (if expression
-          (make-instance 'function-definition
-            :prototype prototype
-            :body expression))))))
+        (let ((expression (parse-expression)))
+          (if expression
+              (make-instance 'function-definition
+                             :prototype prototype
+                             :body expression))))))
 
 (defun parse-top-level-expression ()
   (let ((expression (parse-expression)))
     (if expression
-      (make-instance 'function-definition
-        :prototype (make-instance 'prototype)
-        :body expression))))
+        (make-instance 'function-definition
+                       :prototype (make-instance 'prototype)
+                       :body expression))))
 
 (defun parse-extern ()
   (get-next-token) ; eat extern
