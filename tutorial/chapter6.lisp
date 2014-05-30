@@ -1,5 +1,5 @@
 (defpackage kaleidoscope.chapter6
-  (:use #:cl) ; would normally use #:llvm, but wanted to make usage clear
+  (:use #:cl #:autowrap.minimal) ; would normally use #:llvm, but wanted to make usage clear
   (:shadow #:condition)
   (:export #:toplevel))
 
@@ -18,15 +18,15 @@
      'tok-identifier, or 'tok-number."
     (flet ((get-char () (read-char *standard-input* nil nil)))
       (loop while (find last-char +whitespace+)
-        do (setf last-char (get-char)))
+            do (setf last-char (get-char)))
       (cond ((eql last-char nil) ; check for EOF, do not eat
              'tok-eof)
             ((alpha-char-p last-char)
              (setf *identifier-string*
                    (coerce (cons last-char
                                  (loop do (setf last-char (get-char))
-                                   while (alphanumericp last-char)
-                                   collecting last-char))
+                                       while (alphanumericp last-char)
+                                       collecting last-char))
                            'string))
              (cond ((string= *identifier-string* "def") 'tok-def)
                    ((string= *identifier-string* "extern") 'tok-extern)
@@ -37,6 +37,7 @@
                    ((string= *identifier-string* "in") 'tok-in)
                    ((string= *identifier-string* "binary") 'tok-binary)
                    ((string= *identifier-string* "unary") 'tok-unary)
+                   ((string= *identifier-string* "exit") 'tok-eof)
                    (t 'tok-identifier)))
             ((or (digit-char-p last-char) (char= last-char #\.))
              (setf *number-value*
@@ -44,14 +45,14 @@
                      (read-from-string
                       (coerce (cons last-char
                                     (loop do (setf last-char (get-char))
-                                      while (or (digit-char-p last-char)
-                                                (char= last-char #\.))
-                                      collecting last-char))
+                                          while (or (digit-char-p last-char)
+                                                    (char= last-char #\.))
+                                          collecting last-char))
                               'string))))
              'tok-number)
             ((eql last-char #\#) ; comment until end of line
              (loop do (setf last-char (get-char))
-               until (find last-char '(nil #\linefeed #\return)))
+                   until (find last-char '(nil #\linefeed #\return)))
              (if (null last-char) 'tok-eof (read-token)))
             (t
              (let ((this-char last-char))
@@ -143,25 +144,25 @@
 (defun parse-identifier-expression ()
   (let ((id-name *identifier-string*))
     (if (eql (get-next-token) #\()
-      (prog2 (get-next-token) ; eat (
-          (make-instance 'call-expression
-            :callee id-name
-            :arguments (if (not (eql *current-token* #\)))
-                         (loop
-                           for arg = (parse-expression)
-                           unless arg
-                           do (return-from parse-identifier-expression)
-                           collecting arg
-                           until (eql *current-token* #\))
-                           do (or (eql *current-token* #\,)
-                                  (error 'kaleidoscope-error
-                                         :message "Expected ')' or ',' in argument list"))
-                              (get-next-token))))
-        (get-next-token)) ; eat the ')'.
-      (make-instance 'variable-expression :name id-name))))
+        (prog2 (get-next-token) ; eat (
+            (make-instance 'call-expression
+                           :callee id-name
+                           :arguments (if (not (eql *current-token* #\)))
+                                          (loop
+                                            for arg = (parse-expression)
+                                            unless arg
+                                              do (return-from parse-identifier-expression)
+                                            collecting arg
+                                            until (eql *current-token* #\))
+                                            do (or (eql *current-token* #\,)
+                                                   (error 'kaleidoscope-error
+                                                          :message "Expected ')' or ',' in argument list"))
+                                               (get-next-token))))
+          (get-next-token)) ; eat the ')'.
+        (make-instance 'variable-expression :name id-name))))
 
 (defun parse-number-expression ()
-  (prog1 (make-instance 'number-expression :value *number-value*)
+  (prog1 (make-instance 'number-expression :value (coerce *number-value* 'double-float))
     (get-next-token)))
 
 (defun parse-paren-expression ()
@@ -169,8 +170,8 @@
   (let ((v (parse-expression)))
     (when v
       (if (eql *current-token* #\))
-        (get-next-token)
-        (error 'kaleidoscope-error :message "expected ')'"))
+          (get-next-token)
+          (error 'kaleidoscope-error :message "expected ')'"))
       v)))
 
 (defun parse-if-expression ()
@@ -188,7 +189,7 @@
           (let ((else (parse-expression)))
             (when else
               (make-instance 'if-expression
-                :condition condition :then then :else else))))))))
+                             :condition condition :then then :else else))))))))
 
 (defun parse-for-expression ()
   (get-next-token) ; eat the for.
@@ -220,8 +221,8 @@
               (let ((body (parse-expression)))
                 (when body
                   (make-instance 'for-expression
-                    :var-name id-name :start start :end end :step step
-                    :body body))))))))))
+                                 :var-name id-name :start start :end end :step step
+                                 :body body))))))))))
 
 (defun parse-primary ()
   (case *current-token*
@@ -237,32 +238,32 @@
   ;; If the current token is not an operator, it must be a primary expr.
   (if (or (not (characterp *current-token*))
           (find *current-token* '(#\( #\,)))
-    (parse-primary)
-    ;; If this is a unary operator, read it.
-    (let ((opcode *current-token*))
-      (get-next-token)
-      (let ((operand (parse-unary)))
-        (when operand
-          (make-instance 'unary-expression :opcode opcode :operand operand))))))
+      (parse-primary)
+      ;; If this is a unary operator, read it.
+      (let ((opcode *current-token*))
+        (get-next-token)
+        (let ((operand (parse-unary)))
+          (when operand
+            (make-instance 'unary-expression :opcode opcode :operand operand))))))
 
 (defun parse-bin-op-rhs (expression-precedence lhs)
   (do () (nil)
     (let ((token-precedence (get-precedence *current-token*)))
       (if (< token-precedence expression-precedence)
-        (return-from parse-bin-op-rhs lhs)
-        (let ((binary-operator *current-token*))
-          (get-next-token)
-          (let ((rhs (parse-unary)))
-            (when rhs
-              (let ((next-precedence (get-precedence *current-token*)))
-                (when (< token-precedence next-precedence)
-                  (setf rhs (parse-bin-op-rhs (1+ token-precedence) rhs))
-                  (unless rhs
-                    (return-from parse-bin-op-rhs))))
-              (setf lhs
-                    (make-instance 'binary-expression
-                      :operator binary-operator
-                      :lhs lhs :rhs rhs)))))))))
+          (return-from parse-bin-op-rhs lhs)
+          (let ((binary-operator *current-token*))
+            (get-next-token)
+            (let ((rhs (parse-unary)))
+              (when rhs
+                (let ((next-precedence (get-precedence *current-token*)))
+                  (when (< token-precedence next-precedence)
+                    (setf rhs (parse-bin-op-rhs (1+ token-precedence) rhs))
+                    (unless rhs
+                      (return-from parse-bin-op-rhs))))
+                (setf lhs
+                      (make-instance 'binary-expression
+                                     :operator binary-operator
+                                     :lhs lhs :rhs rhs)))))))))
 
 (defun parse-expression ()
   (let ((lhs (parse-unary)))
@@ -302,7 +303,7 @@
     (unless (eql (get-next-token) #\()
       (error 'kaleidoscope-error :message "Expected '(' in prototype"))
     (let ((arg-names (coerce (loop while (eql (get-next-token) 'tok-identifier)
-                               collecting *identifier-string*)
+                                   collecting *identifier-string*)
                              'vector)))
       (unless (eql *current-token* #\))
         (error 'kaleidoscope-error :message "Expected ')' in prototype"))
@@ -311,25 +312,25 @@
         (error 'kaleidoscope-error
                :message "Invalid number of operands for operator"))
       (make-instance 'prototype
-        :name function-name :arguments arg-names
-        :operatorp operator-arity :precedence binary-precedence))))
+                     :name function-name :arguments arg-names
+                     :operatorp operator-arity :precedence binary-precedence))))
 
 (defun parse-definition ()
   (get-next-token) ; eat def
   (let ((prototype (parse-prototype)))
     (if prototype
-      (let ((expression (parse-expression)))
-        (if expression
-          (make-instance 'function-definition
-            :prototype prototype
-            :body expression))))))
+        (let ((expression (parse-expression)))
+          (if expression
+              (make-instance 'function-definition
+                             :prototype prototype
+                             :body expression))))))
 
 (defun parse-top-level-expression ()
   (let ((expression (parse-expression)))
     (if expression
-      (make-instance 'function-definition
-        :prototype (make-instance 'prototype)
-        :body expression))))
+        (make-instance 'function-definition
+                       :prototype (make-instance 'prototype)
+                       :body expression))))
 
 (defun parse-extern ()
   (get-next-token) ; eat extern
@@ -356,9 +357,9 @@
       (let ((f (llvm:named-function *module*
                                     (format nil "unary~a"
                                             (opcode expression)))))
-        (unless f
+        (unless (not (wrapper-null-p f))
           (error 'kaleidoscope-error :message "Unknown unary operator"))
-        (llvm:build-call *builder* f (list operand-v) "unop")))))
+        (llvm:build-call *builder* f (vector operand-v) "unop")))))
 
 (defmethod codegen ((expression binary-expression))
   (let ((l (codegen (lhs expression)))
@@ -378,26 +379,27 @@
          (let ((f (llvm:named-function *module*
                                        (format nil "binary~a"
                                                (operator expression)))))
-           (assert f () "binary operator not found!")
-           (llvm:build-call *builder* f (list l r) "binop")))))))
+           (assert (not (wrapper-null-p f)) ()
+                   "binary operator not found!")
+           (llvm:build-call *builder* f (vector l r) "binop")))))))
 
 (defmethod codegen ((expression call-expression))
   (let ((callee (llvm:named-function *module* (callee expression))))
-    (if callee
-      (if (= (llvm:count-params callee) (length (arguments expression)))
-        (llvm:build-call *builder*
-                         callee
-                         (map 'vector #'codegen (arguments expression))
-                         "calltmp")
-        (error 'kaleidoscope-error :message "incorrect # arguments passed"))
-      (error 'kaleidoscope-error :message "unknown function referenced"))))
+    (if (not (wrapper-null-p callee))
+        (if (= (llvm:count-params callee) (length (arguments expression)))
+            (llvm:build-call *builder*
+                             callee
+                             (map 'vector #'codegen (arguments expression))
+                             "calltmp")
+            (error 'kaleidoscope-error :message "incorrect # arguments passed"))
+        (error 'kaleidoscope-error :message "unknown function referenced"))))
 
 (defmethod codegen ((expression if-expression))
   (let ((cond-v (codegen (condition expression))))
     (when cond-v
       (setf cond-v
             (llvm:build-f-cmp *builder* 
-                              :/= cond-v (llvm:const-real (llvm:double-type) 0)
+                              :/= cond-v (llvm:const-real (llvm:double-type) 0d0)
                               "ifcond"))
       (let* ((function (llvm:basic-block-parent
                         (llvm:insertion-block *builder*)))
@@ -425,8 +427,8 @@
                 (let ((pn (llvm:build-phi *builder*
                                           (llvm:double-type) "iftmp")))
                   (llvm:add-incoming pn
-                                     (list then-v else-v)
-                                     (list then-bb else-bb))
+                                     (vector then-v else-v)
+                                     (vector then-bb else-bb))
                   pn)))))))))
 
 (defmethod codegen ((expression for-expression))
@@ -442,13 +444,13 @@
         (let ((variable (llvm:build-phi *builder*
                                         (llvm:double-type)
                                         (var-name expression))))
-          (llvm:add-incoming variable (list start-val) (list preheader-bb))
+          (llvm:add-incoming variable (vector start-val) (vector preheader-bb))
           (let ((old-val (gethash (var-name expression) *named-values*)))
             (setf (gethash (var-name expression) *named-values*) variable)
             (when (codegen (body expression))
               (let ((step-val (if (step* expression)
-                                (codegen (step* expression))
-                                (llvm:const-real (llvm:double-type) 1))))
+                                  (codegen (step* expression))
+                                  (llvm:const-real (llvm:double-type) 1d0))))
                 (when step-val
                   (let ((next-var (llvm:build-f-add *builder*
                                                     variable
@@ -462,7 +464,7 @@
                                               end-cond
                                               (llvm:const-real
                                                (llvm:double-type)
-                                               0)
+                                               0d0)
                                               "loopcond"))
                       (let ((loop-end-bb (llvm:insertion-block *builder*))
                             (after-bb (llvm:append-basic-block function
@@ -470,11 +472,11 @@
                         (llvm:build-cond-br *builder* end-cond loop-bb after-bb)
                         (llvm:position-builder *builder* after-bb)
                         (llvm:add-incoming variable
-                                           (list next-var) (list loop-end-bb))
+                                           (vector next-var) (vector loop-end-bb))
                         (if old-val
-                          (setf (gethash (var-name expression) *named-values*)
-                                old-val)
-                          (remhash (var-name expression) *named-values*))
+                            (setf (gethash (var-name expression) *named-values*)
+                                  old-val)
+                            (remhash (var-name expression) *named-values*))
                         ;; for expr always returns 0.
                         (llvm:const-null (llvm:double-type))))))))))))))
 
@@ -516,18 +518,18 @@
                                     (llvm:append-basic-block function "entry"))
       (let ((retval (codegen (body expression))))
         (if retval
-          (progn
-            (llvm:build-ret *builder* retval)
-            (unless (llvm:verify-function function)
-              (error 'kaleidoscope-error
-                     :message "Function verification failure."))
-            (llvm:run-function-pass-manager *fpm* function)
-            function)
-          (progn
-            (llvm:delete-function function)
-            (when (binary-operator-p (prototype expression))
-              (remhash (operator-name (prototype expression))
-                       *binop-precedence*))))))))
+            (progn
+              (llvm:build-ret *builder* retval)
+              (unless (llvm:verify-function function)
+                (error 'kaleidoscope-error
+                       :message "Function verification failure."))
+              (llvm:run-function-pass-manager *fpm* function)
+              function)
+            (progn
+              (llvm:delete-function function)
+              (when (binary-operator-p (prototype expression))
+                (remhash (operator-name (prototype expression))
+                         *binop-precedence*))))))))
 
 ;;; top-level
 
@@ -536,20 +538,20 @@
 (defun handle-definition ()
   (let ((function (parse-definition)))
     (if function
-      (let ((lf (codegen function)))
-        (when lf
-          (format *error-output* "Read function definition:")
-          (llvm:dump-value lf)))
-      (get-next-token))))
+        (let ((lf (codegen function)))
+          (when lf
+            (format *error-output* "Read function definition:")
+            (llvm:dump-value lf)))
+        (get-next-token))))
 
 (defun handle-extern ()
   (let ((prototype (parse-extern)))
     (if prototype
-      (let ((function (codegen prototype)))
-        (when function
-          (format *error-output* "Read extern: ")
-          (llvm:dump-value function)))
-      (get-next-token))))
+        (let ((function (codegen prototype)))
+          (when function
+            (format *error-output* "Read extern: ")
+            (llvm:dump-value function)))
+        (get-next-token))))
 
 (defun handle-top-level-expression ()
   "Evaluate a top-level expression into an anonymous function."
@@ -576,6 +578,7 @@
 (defun main-loop ()
   (do () ((eql *current-token* 'tok-eof))
     (format *error-output* "~&ready> ")
+    (finish-output *error-output*)
     (handler-case (case *current-token*
                     (#\; (get-next-token))
                     (tok-def (handle-definition))
@@ -597,11 +600,10 @@
         (gethash #\+ *binop-precedence*) 20
         (gethash #\- *binop-precedence*) 30
         (gethash #\* *binop-precedence*) 40)
-  (llvm:with-objects ((*builder* 'llvm:builder)
-                      (*module* 'llvm:module :name "my cool jit")
-                      (*execution-engine* 'llvm:execution-engine
-                                          :module *module*)
-                      (*fpm* 'llvm:function-pass-manager :module *module*))
+  (llvm:with-objects ((*builder* llvm:builder)
+                      (*module* llvm:module "my cool jit")
+                      (*execution-engine* llvm:execution-engine *module*)
+                      (*fpm* llvm:function-pass-manager *module*))
     (llvm:add-target-data (llvm:target-data *execution-engine*) *fpm*)
     (llvm:add-instruction-combining-pass *fpm*)
     (llvm:add-reassociate-pass *fpm*)
@@ -610,6 +612,7 @@
     (llvm:initialize-function-pass-manager *fpm*)
 
     (format *error-output* "~&ready> ")
+    (finish-output *error-output*)
     (get-next-token)
     (main-loop)
     (llvm:dump-module *module*)))

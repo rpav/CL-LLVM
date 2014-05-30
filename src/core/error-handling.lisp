@@ -85,7 +85,7 @@
        (carray-to-list (,pointer-var &) ,type ,length))))
 
 (defmacro create-or-error ((var error-var ptr-var type)
-                           creation-form cleanup-form)
+                           creation-form &optional cleanup-form)
   "Produce a wrapper for `TYPE` if `CREATION-FORM` returns 0;
 otherwise produce an `LLVM-ERROR`.  `VAR` and `ERROR-VAR` are
 temporary pointers provided to `CREATION-FORM` as per `C-WITH`.
@@ -96,6 +96,8 @@ object."
             (,error-var :pointer))
      (if (/= 0 ,creation-form)
          (error 'llvm-error :message ,error-var)
-         (making-autocollect-instance (,ptr-var ,type) ,var
-           ,cleanup-form))))
+         ,(if cleanup-form
+              `(making-autocollect-instance (,ptr-var ,type) ,var
+                ,cleanup-form)
+              `(autowrap:make-wrapper-instance ',type :ptr ,var)))))
 

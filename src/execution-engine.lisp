@@ -2,19 +2,16 @@
 
 (defun make-execution-engine (module)
   (create-or-error (out-ee out-error ptr llvm.ffi:execution-engine-ref)
-      (create-execution-engine-for-module (out-ee &) module (out-error &))
-    (%dispose-execution-engine ptr)))
+      (create-execution-engine-for-module (out-ee &) module (out-error &))))
 
 (defun make-interpreter (module)
   (create-or-error (out-interp out-error ptr llvm.ffi:execution-engine-ref)
-      (create-interpreter-for-module (out-interp &) module (out-error &))
-    (%dispose-execution-engine ptr)))
+      (create-interpreter-for-module (out-interp &) module (out-error &))))
 
 (defun make-jit-compiler (module &optional (optimization-level :default))
   (create-or-error (out-jit out-error ptr llvm.ffi:execution-engine-ref)
       (create-jit-compiler-for-module (out-jit &) module optimization-level
-                                      (out-error &))
-    (%dispose-execution-engine ptr)))
+                                      (out-error &))))
 
 ;; FIXME: Not handling args and env properly here
 (defun run-function-as-main (execution-engine function args env)
