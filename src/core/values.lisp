@@ -4,6 +4,9 @@
   (set-value-name val name)
   name)
 
+(defun value-name (val)
+  (%get-value-name val))
+
 (defun dump-value (val)
   (finish-output *error-output*)
   (%dump-value val))

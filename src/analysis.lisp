@@ -7,5 +7,5 @@
       t)))
 
 (defun verify-function (fn)
-  (not (%verify-function fn :return-status)))
+  (= 0 (%verify-function fn :return-status)))
 

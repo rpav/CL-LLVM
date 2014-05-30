@@ -28,5 +28,6 @@
   (%build-in-bounds-gep b pointer indices (length indices) name))
 
 (defun build-call (builder fn args name)
-  (%build-call builder fn args (length args) name))
+  (with-pointer-vector-to-carray (array args)
+    (%build-call builder fn (array &) (length args) name)))
 

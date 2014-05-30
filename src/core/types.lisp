@@ -35,7 +35,9 @@
   (ppc-fp128-type-in-context context))
 
 (defun function-type (return-type param-types &key var-arg-p)
-  (%function-type return-type param-types (length param-types) var-arg-p))
+  (with-pointer-vector-to-carray (c-param-types param-types)
+    (%function-type return-type (c-param-types &) (length param-types)
+                    (if var-arg-p 1 0))))
 
 (defun param-types (function-ty)
   (with-pointer-to-list (pointer llvm.ffi:type-ref (count-param-types function-ty))

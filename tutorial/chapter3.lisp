@@ -1,5 +1,5 @@
 (defpackage kaleidoscope.chapter3
-  (:use #:cl) ; would normally use #:llvm, but wanted to make usage clear
+  (:use #:cl #:autowrap.minimal) ; would normally use #:llvm, but wanted to make usage clear
   (:export #:toplevel))
 
 (in-package :kaleidoscope.chapter3)
@@ -29,6 +29,7 @@
                            'string))
              (cond ((string= *identifier-string* "def") 'tok-def)
                    ((string= *identifier-string* "extern") 'tok-extern)
+                   ((string= *identifier-string* "exit") 'tok-eof)
                    (t 'tok-identifier)))
             ((or (digit-char-p last-char) (char= last-char #\.))
              (setf *number-value*
@@ -122,7 +123,7 @@
       (make-instance 'variable-expression :name id-name))))
 
 (defun parse-number-expression ()
-  (prog1 (make-instance 'number-expression :value *number-value*)
+  (prog1 (make-instance 'number-expression :value (coerce *number-value* 'double-float))
     (get-next-token)))
 
 (defun parse-paren-expression ()
@@ -238,14 +239,14 @@
 
 (defmethod codegen ((expression call-expression))
   (let ((callee (llvm:named-function *module* (callee expression))))
-    (if callee
-      (if (= (llvm:count-params callee) (length (arguments expression)))
-        (llvm:build-call *builder*
-                         callee
-                         (map 'vector #'codegen (arguments expression))
-                         "calltmp")
-        (error 'kaleidoscope-error :message "incorrect # arguments passed"))
-      (error 'kaleidoscope-error :message "unknown function referenced"))))
+    (if (not (wrapper-null-p callee))
+        (if (= (llvm:count-params callee) (length (arguments expression)))
+            (llvm:build-call *builder*
+                             callee
+                             (map 'vector #'codegen (arguments expression))
+                             "calltmp")
+            (error 'kaleidoscope-error :message "incorrect # arguments passed"))
+        (error 'kaleidoscope-error :message "unknown function referenced"))))
 
 (defmethod codegen ((expression prototype))
   (let* ((doubles (make-array (length (arguments expression))
@@ -289,7 +290,6 @@
             (llvm:delete-function function))))))
 
 ;;; top-level
-  
 
 (defun handle-definition ()
   (let ((function (parse-definition)))
@@ -311,7 +311,7 @@
 
 (defun handle-top-level-expression ()
   "Evaluate a top-level expression into an anonymous function."
-  (handler-case 
+  (handler-case
       (let ((lf (codegen (parse-top-level-expression))))
         (format *error-output* "Read top-level expression:")
         (llvm:dump-value lf))
@@ -327,6 +327,7 @@
 (defun main-loop ()
   (do () ((eql *current-token* 'tok-eof))
     (format *error-output* "~&ready> ")
+    (finish-output *error-output*)
     (handler-case (case *current-token*
                     (#\; (get-next-token))
                     (tok-def (handle-definition))
@@ -347,9 +348,11 @@
         (gethash #\+ *binop-precedence*) 20
         (gethash #\- *binop-precedence*) 30
         (gethash #\* *binop-precedence*) 40)
-  (llvm:with-objects ((*builder* 'llvm:builder)
-                      (*module* 'llvm:module :name "my cool jit"))
-    (format *error-output* "~&ready> ")
-    (get-next-token)
-    (main-loop)
-    (llvm:dump-module *module*)))
+  (let ((*current-token*))
+    (llvm:with-objects ((*builder* llvm:builder)
+                        (*module* llvm:module "my cool jit"))
+      (format *error-output* "~&ready> ")
+      (finish-output *error-output*)
+      (get-next-token)
+      (main-loop)
+      (llvm:dump-module *module*))))

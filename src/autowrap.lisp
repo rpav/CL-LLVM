@@ -50,6 +50,7 @@
                       ("LLVMDisposeMemoryBuffer" . "%DISPOSE-MEMORY-BUFFER")
                       ("LLVMDisposeModule" . "%DISPOSE-MODULE")
                       ("LLVMDisposeExecutionEngine" . "%DISPOSE-EXECUTION-ENGINE")
+                      ("LLVMGetValueName" . "%GET-VALUE-NAME")
 
                       ;; Unused "conflicting" functions renamed as private
                       ("LLVMInsertBasicBlock" . "%INSERT-BASIC-BLOCK")
