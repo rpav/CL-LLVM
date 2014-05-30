@@ -148,5 +148,9 @@
   is-tail-call)
 
 (defun add-incoming (phi-node incoming-values incoming-blocks)
-  (%add-incoming phi-node
-                 incoming-values incoming-blocks (length incoming-values)))
+  (with-pointer-vector-to-carray (values-array incoming-values)
+    (with-pointer-vector-to-carray (blocks-array incoming-blocks)
+      (%add-incoming phi-node
+                     (values-array &)
+                     (blocks-array &)
+                     (length incoming-values)))))
